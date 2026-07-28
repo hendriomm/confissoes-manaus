@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 interface ConfessionSchedule {
@@ -106,31 +106,6 @@ function getNextConfession(schedule: { day: string; startTime: string }[]) {
   return null;
 }
 
-function Spinner() {
-  return (
-    <svg
-      className="animate-spin h-5 w-5 text-blue-600"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-      />
-    </svg>
-  );
-}
-
 export default function ChurchList({ churches }: ChurchListProps) {
   const [userLocation, setUserLocation] = useState<{
     lat: number;
@@ -139,30 +114,12 @@ export default function ChurchList({ churches }: ChurchListProps) {
   const [nearbyResults, setNearbyResults] = useState<NearbyChurch[] | null>(
     null
   );
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [geoSupported, setGeoSupported] = useState(true);
   const [showNearby, setShowNearby] = useState(false);
 
   useEffect(() => {
     setGeoSupported("geolocation" in navigator);
-  }, []);
-
-  const fetchNearby = useCallback(async (lat: number, lng: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/churches/nearby?lat=${lat}&lng=${lng}&radius=10`
-      );
-      if (!res.ok) throw new Error("Erro ao buscar igrejas próximas");
-      const data = await res.json();
-      setNearbyResults(data.churches);
-    } catch {
-      setError("Não foi buscar igrejas próximas. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
   }, []);
 
   const handleNearbyClick = () => {
@@ -184,13 +141,27 @@ export default function ChurchList({ churches }: ChurchListProps) {
       (position) => {
         const { latitude, longitude } = position.coords;
         setUserLocation({ lat: latitude, lng: longitude });
-        fetchNearby(latitude, longitude);
+
+        const RADIUS_KM = 10;
+        const nearby: NearbyChurch[] = churches
+          .map((church) => ({
+            ...church,
+            distance: getDistance(
+              latitude,
+              longitude,
+              church.latitude,
+              church.longitude
+            ),
+          }))
+          .filter((church) => church.distance <= RADIUS_KM)
+          .sort((a, b) => a.distance - b.distance);
+
+        setNearbyResults(nearby);
       },
       () => {
         setError(
           "Permita o acesso à localização para encontrar igrejas perto de você."
         );
-        setLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -203,14 +174,9 @@ export default function ChurchList({ churches }: ChurchListProps) {
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <button
             onClick={handleNearbyClick}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold py-3 px-4 rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all disabled:opacity-60"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold py-3 px-4 rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all"
           >
-            {loading ? (
-              <>
-                <Spinner /> Buscando igrejas próximas...
-              </>
-            ) : nearbyResults ? (
+            {nearbyResults ? (
               <>✕ Fechar igrejas próximas</>
             ) : (
               <>📍 Igrejas perto de mim</>
