@@ -1,5 +1,9 @@
 [build]
   command = "npx prisma generate && npx prisma db push --skip-generate && npx prisma db seed && npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
